@@ -23,37 +23,44 @@ let layers = [
     {
         start_height: 0,
         color: Vec4(0, 0, 1, 0),
-        texture_file: "images/textures/water.jpg",
-        texture_period: 20,
+        texture_file: "images/textures/water.png",
+        texture_period: 1000,
         blend: 0,
         texture: -1
     }, {
-        start_height: 0.1,
+        start_height: 0.078,
         color: Vec4(0.761, 0.698, 0.502, 0),
-        texture_file: "images/textures/sand.jpg",
-        texture_period: 200,
-        blend: 0,
+        texture_file: "images/textures/sandy_grass.png",
+        texture_period: 500,
+        blend: 0.02,
         texture: -1
     }, {
-        start_height: 0.15,
+        start_height: 0.088,
         color: Vec4(0, 0.5, 0, 0),
-        texture_file: "images/textures/grass.jpg",
-        texture_period: 20,
-        blend: 0.2,
+        texture_file: "images/textures/grass.png",
+        texture_period: 200,
+        blend: 0.04,
         texture: -1
     }, {
-        start_height: 0.4,
+        start_height: 0.225,
         color:Vec4(0.3, 0.3, 0.3, 0),
-        texture_file: "images/textures/rock.jpg",
-        texture_period: 2,
-        blend: 0.2,
+        texture_file: "images/textures/stony_ground.png",
+        texture_period: 200,
+        blend: 0.107,
         texture: -1
     }, {
-        start_height: 0.95,
+        start_height: 0.431,
         color: Vec4(1, 1, 1, 0),
-        texture_file: "images/textures/snow.jpg",
-        texture_period: 2,
-        blend: 0.2,
+        texture_file: "images/textures/rocks_1.png",
+        texture_period: 200,
+        blend: 0.313,
+        texture: -1
+    }, {
+        start_height: 0.843,
+        color: Vec4(1, 1, 1, 0),
+        texture_file: "images/textures/snow.png",
+        texture_period: 200,
+        blend: 0.284,
         texture: -1
     }
 ];
@@ -238,8 +245,6 @@ function init_textures() {
 
                 gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
-                // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-                // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
                 gl.generateMipmap(gl.TEXTURE_2D);
@@ -247,9 +252,11 @@ function init_textures() {
                 gl.bindVertexArray(null);
             }
         }(i);
-        image.onerror = (event) => {
-            console.error(`Unable to load image: ${event}`);
-        };
+        image.onerror = function (image_path) {
+            return function(event) {
+                console.error(`Unable to load image: ${image_path}`);
+            }
+        }(layer.texture_file);
         image.src = layer.texture_file;
 
         ++i;
@@ -271,7 +278,7 @@ function init_gui() {
         UserInterface.end_use();
 
         UserInterface.use_field_set('V', "Rendering");
-            slider_drawMode = UserInterface.add_list_input(['Colors', 'Textures'], 0, update_wgl);
+            slider_drawMode = UserInterface.add_list_input(['Colors', 'Textures'], 1, update_wgl);
         UserInterface.end_use();
     UserInterface.end();
 }
@@ -390,6 +397,7 @@ function lerpInt(a, b, t) {
 
 
 function normalizeHeightmap() {
+    // TODO: corriger, l'affichage n'est pas normalisé
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 
     let pixels = new Uint8Array(mapWidth * mapHeight * 4);
