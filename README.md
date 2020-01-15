@@ -11,5 +11,9 @@ des couches (eau, sable, herbe, etc.) sont au début du fichier JavaScript car i
 de paramètres.  
 
 ### TODO
-- Corriger la bogue sur la normalisation de la heightmap
-- Appliquer les texture dans le direction de la pente et pas parralèle au sol pour éviter la distorsion des textures
+- Utiliser les normals
+    - Pour appliquer un modèle de Phong (ou PBR)
+    - Pour projeter les textures de manière parallèle  à la surface et non pas parallèle à la mer
+- Génération plus poussée
+    - Ajouter un offset random pour chaque octave
+    - Simuler l'érosion
