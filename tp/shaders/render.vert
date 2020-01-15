@@ -18,7 +18,7 @@ void main() {
     heightmapCoord.x = iPosition.x / float(uMapWidth);
     heightmapCoord.y = iPosition.y / float(uMapHeight);
 
-    float height = texture(uSampler, heightmapCoord).y * uHeightScale;
+    float height = texture(uSampler, heightmapCoord).x * uHeightScale;
 
     gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * vec4(iPosition, height, 1.f);
 }

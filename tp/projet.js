@@ -19,19 +19,21 @@ let slider_heightScale;
 
 let slider_drawMode;
 
+let generate_button;
+
 let layers = [
     {
         start_height: 0,
         color: Vec4(0, 0, 1, 0),
         texture_file: "images/textures/water.png",
-        texture_period: 1000,
+        texture_period: 200,
         blend: 0,
         texture: -1
     }, {
         start_height: 0.078,
         color: Vec4(0.761, 0.698, 0.502, 0),
         texture_file: "images/textures/sandy_grass.png",
-        texture_period: 500,
+        texture_period: 200,
         blend: 0.02,
         texture: -1
     }, {
@@ -50,7 +52,7 @@ let layers = [
         texture: -1
     }, {
         start_height: 0.431,
-        color: Vec4(1, 1, 1, 0),
+        color: Vec4(0.4, 0.4, 0.4, 0),
         texture_file: "images/textures/rocks_1.png",
         texture_period: 200,
         blend: 0.313,
@@ -75,7 +77,12 @@ let normalizedHeightMap = null;
 
 let renderShader = null;
 
-function generateTerrainVT(width, height) {
+
+//--------------------------------------------------------------------------------------------------------
+// Initialization Functions
+//--------------------------------------------------------------------------------------------------------
+
+function generate_terrain_vert_tri(width, height) {
     let vertices = [];
     let triangles = [];
 
@@ -186,7 +193,7 @@ function init_heightmap_generation() {
 
 function init_vao() {
     ////////// TRIANGLES CREATION //////////
-    let data = generateTerrainVT(mapWidth, mapHeight);
+    let data = generate_terrain_vert_tri(mapWidth, mapHeight);
     triangles_count = (mapWidth - 1) * (mapHeight - 1) * 2;
 
 
@@ -268,45 +275,29 @@ function init_gui() {
     UserInterface.begin();
         UserInterface.use_field_set('V', "Generation");
             UserInterface.use_field_set('H', "");
-                slider_octaves = UserInterface.add_slider('Octaves', 1, 10, 4, update_wgl);
-                slider_persistance = UserInterface.add_slider('Persistance', 0, 100, 60, update_wgl);
-                slider_lacunarity = UserInterface.add_slider('Lacunarity', 0, 300, 200, update_wgl);
+                slider_octaves = UserInterface.add_slider('Octaves', 1, 10, 4, null);
+                slider_persistance = UserInterface.add_slider('Persistance', 0, 100, 60, null);
+                slider_lacunarity = UserInterface.add_slider('Lacunarity', 0, 300, 200, null);
             UserInterface.end_use();
-            UserInterface.use_field_set('H', "");
-                slider_heightScale = UserInterface.add_slider('Height Scale', 1, 100, 30, update_wgl);
-            UserInterface.end_use();
+            generate_button = UserInterface.add_button('Generate Heightmap', generate_heightmap);
         UserInterface.end_use();
 
         UserInterface.use_field_set('V', "Rendering");
-            slider_drawMode = UserInterface.add_list_input(['Colors', 'Textures'], 1, update_wgl);
+            let mods = ['Colors', 'Textures', 'Heights', 'Normals', 'UVs'];
+            slider_drawMode = UserInterface.add_list_input(mods, 0, update_wgl);
+            UserInterface.use_field_set('H', "");
+                slider_heightScale = UserInterface.add_slider('Height Scale', 1, 100, 30, update_wgl);
+            UserInterface.end_use();
         UserInterface.end_use();
     UserInterface.end();
 }
 
 
-function init_wgl() {
-    ewgl.continuous_update = true;
+//--------------------------------------------------------------------------------------------------------
+// Height Map
+//--------------------------------------------------------------------------------------------------------
 
-    init_gui();
-
-    init_heightmap_generation();
-
-    renderShader = ShaderProgramFromFiles(
-        "shaders/render.vert",
-        "shaders/render.frag",
-        'basic shader'
-    );
-
-    init_vao();
-
-    init_textures();
-
-    gl.clearColor(0, 0, 0, 1);
-    gl.enable(gl.DEPTH_TEST);
-}
-
-
-function generate_heightmap() {
+function generate_heightmap_texture() {
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
     gl.viewport(0, 0, mapWidth, mapHeight);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -336,6 +327,94 @@ function generate_heightmap() {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
 
+function lerp_int(a, b, t) {
+    return Math.round(a + t * (b - a));
+}
+
+function generate_normals(data) {
+    let normals = Array(mapWidth * mapHeight).fill(Vec3(0, 0, 0));
+    let vertices = Array(mapWidth * mapHeight);
+
+    for (let x = 0; x < mapWidth; ++x) {
+        for (let y = 0; y < mapHeight; ++y) {
+            let i = y * mapWidth + x;
+            vertices[i] = Vec3(x, y, data.pixels[i * 4]);
+        }
+    }
+
+    for (let x = 0; x < mapWidth -1; ++x) {
+        for (let y = 0; y < mapHeight -1; ++y) {
+            let ia = y * mapWidth + x;
+            let ib = y * mapWidth + x + 1;
+            let ic = (y + 1) * mapWidth + x;
+
+            let e1 = vertices[ia].sub(vertices[ib]);
+            let e2 = vertices[ic].sub(vertices[ib]);
+            let n = e1.cross(e2);
+
+            normals[ia] = normals[ia].add(n);
+            normals[ib] = normals[ib].add(n);
+            normals[ic] = normals[ic].add(n);
+        }
+    }
+
+    for (let i = 0; i < mapWidth * mapHeight; ++i) {
+        let len = Math.sqrt(normals[i].x * normals[i].x + normals[i].y * normals[i].y + normals[i].z * normals[i].z);
+        data.pixels[i * 4 + 1] = (normals[i].x / len) * 255;
+        data.pixels[i * 4 + 2] = (normals[i].y / len) * 255;
+        data.pixels[i * 4 + 3] = (normals[i].z / len) * 255;
+    }
+}
+
+function normalize_heightmap() {
+    // TODO: corriger, l'affichage n'est pas normalisé
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+
+    let pixels = new Uint8Array(mapWidth * mapHeight * 4);
+    gl.readPixels(0, 0, mapWidth, mapHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+
+    let minVal = Number.POSITIVE_INFINITY;
+    let maxVal = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < mapWidth * mapHeight; ++i) {
+        let h = pixels[i * 4]; /* +0 because the height is in the r/x value */
+        if (h < minVal) {
+            minVal = h;
+        } else if (h > maxVal) {
+            maxVal = h;
+        }
+    }
+
+    const range = maxVal - minVal;
+    for (let i = 0; i < mapWidth * mapHeight; ++i) {
+        pixels[i * 4] = lerp_int(0, 255, (pixels[i * 4] - minVal) / range);
+    }
+
+    generate_normals({pixels: pixels});
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, normalizedHeightMap);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, mapWidth, mapHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+
+
+function generate_heightmap() {
+    console.log("Loading heightmap...");
+    generate_button.disabled = true;
+
+    generate_heightmap_texture();
+    normalize_heightmap();
+
+    generate_button.disabled = false;
+    console.log("End loading");
+}
+
+
+//--------------------------------------------------------------------------------------------------------
+// Rendering
+//--------------------------------------------------------------------------------------------------------
 
 function draw_terrain() {
     gl.drawBuffers([gl.BACK]);
@@ -391,46 +470,33 @@ function draw_terrain() {
 }
 
 
-function lerpInt(a, b, t) {
-    return Math.round(a + t * (b - a));
+//--------------------------------------------------------------------------------------------------------
+// Easy WebGL
+//--------------------------------------------------------------------------------------------------------
+
+function init_wgl() {
+    ewgl.continuous_update = true;
+
+    init_gui();
+
+    init_heightmap_generation();
+
+    renderShader = ShaderProgramFromFiles(
+        "shaders/render.vert",
+        "shaders/render.frag",
+        'basic shader'
+    );
+
+    init_vao();
+    init_textures();
+
+    gl.clearColor(0, 0, 0, 1);
+    gl.enable(gl.DEPTH_TEST);
+
+    generate_heightmap();
 }
-
-
-function normalizeHeightmap() {
-    // TODO: corriger, l'affichage n'est pas normalisé
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-
-    let pixels = new Uint8Array(mapWidth * mapHeight * 4);
-    gl.readPixels(0, 0, mapWidth, mapHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-
-    let minVal = Number.POSITIVE_INFINITY;
-    let maxVal = Number.NEGATIVE_INFINITY;
-    for (let i = 0; i < mapWidth * mapHeight; ++i) {
-        let h = pixels[i * 4 + 2]; /* +2 because the height is in the b/z value */
-        if (h < minVal) {
-            minVal = h;
-        } else if (h > maxVal) {
-            maxVal = h;
-        }
-    }
-
-    const range = maxVal - minVal;
-    for (let i = 0; i < mapWidth * mapHeight; ++i) {
-        pixels[i * 4 + 2] = lerpInt(0, 255, (pixels[i * 4 + 2] - minVal) / range);
-    }
-
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, normalizedHeightMap);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, mapWidth, mapHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-    gl.bindTexture(gl.TEXTURE_2D, null);
-
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-}
-
 
 function draw_wgl() {
-    generate_heightmap();
-    normalizeHeightmap();
     draw_terrain();
 }
 

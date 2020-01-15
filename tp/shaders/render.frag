@@ -20,16 +20,22 @@ out vec4 oFragColor;
 
 float invLerp(float a, float b, float v);
 vec2 getLayerTexCoord(int layer);
-vec3 getLayerColor(int layer, vec2 texCoord);
+vec3 getLayerColor(int layer, vec2 texCoord, vec3 normal);
 
 void main() {
-    float height = texture(uHeightmapSampler, heightmapCoord).z;
+    vec4 data = texture(uHeightmapSampler, heightmapCoord);
+    float height = data.x;
+    vec3 normal = data.yzw;
 
     vec3 color = vec3(0.0);
-    for (int i = 0; i < uLayersCount; ++i) {
-        float drawStrength = invLerp(-uLayersBlend[i] / 2.0, uLayersBlend[i] / 2.0, height - uLayersHeights[i]);
-        vec2 layerTexCoord = getLayerTexCoord(i);
-        color = color  * (1.0 - drawStrength) + getLayerColor(i, layerTexCoord) * drawStrength;
+    if (uDrawMode == 2) {
+        color = vec3(height);
+    } else {
+        for (int i = 0; i < uLayersCount; ++i) {
+            float drawStrength = invLerp(-uLayersBlend[i] / 2.0, uLayersBlend[i] / 2.0, height - uLayersHeights[i]);
+            vec2 layerTexCoord = getLayerTexCoord(i);
+            color = color  * (1.0 - drawStrength) + getLayerColor(i, layerTexCoord, normal) * drawStrength;
+        }
     }
     oFragColor = vec4(color, 1.0);
 }
@@ -45,12 +51,12 @@ vec2 getLayerTexCoord(int layer) {
     return layerTexCoord;
 }
 
-vec3 getLayerColor(int layer, vec2 texCoord) {
+vec3 getLayerColor(int layer, vec2 texCoord, vec3 normal) {
     vec3 layerColor;
 
     if (uDrawMode == 0) {
         return uLayersColors[layer].rgb;
-    } else {
+    } else if (uDrawMode == 1) {
         if (layer == 0) {
             layerColor = texture(uLayersSamplers[0], texCoord).rgb;
         } else if (layer == 1) {
@@ -72,5 +78,11 @@ vec3 getLayerColor(int layer, vec2 texCoord) {
         }
 
         return mix(layerColor, uLayersColors[layer].rgb, uLayersColors[layer].a);
+    } else if (uDrawMode == 3) {
+        return normal;
+    } else if (uDrawMode == 4) {
+        return vec3(texCoord, 0.0);
+    } else {
+        return vec3(1.0, 0.0, 1.0);
     }
 }
