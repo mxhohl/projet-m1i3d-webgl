@@ -29,14 +29,14 @@ float generateHeight(vec2 pos) {
     float frequency = 1.f;
 
     for (int i = 0; i < uOctaves; ++i) {
-        vec2 coords = (pos + uNoiseOffset) / 25.f * frequency + vec2(1324, 6534);
+        vec2 coords = (pos + uNoiseOffset) / 25.f * frequency;
         height += simplex(coords) * amplitude;
 
         amplitude *= uPersistance;
         frequency *= uLacunarity;
     }
 
-    height = (height * 0.5f) + 0.01f;
+    height = (height * 0.66f) + 0.01f;
 
     if (height <= uSeaLevel) {
         return uSeaLevel + 0.01f;

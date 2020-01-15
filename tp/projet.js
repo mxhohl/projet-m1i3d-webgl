@@ -15,11 +15,10 @@ let slider_octaves;
 let slider_persistance;
 let slider_lacunarity;
 
-let slider_heightScale;
-
-let slider_drawMode;
-
 let generate_button;
+
+let slider_heightScale;
+let slider_drawMode;
 
 let layers = [
     {
@@ -327,10 +326,6 @@ function generate_heightmap_texture() {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
 
-function lerp_int(a, b, t) {
-    return Math.round(a + t * (b - a));
-}
-
 function generate_normals(data) {
     let normals = Array(mapWidth * mapHeight).fill(Vec3(0, 0, 0));
     let vertices = Array(mapWidth * mapHeight);
@@ -366,6 +361,14 @@ function generate_normals(data) {
     }
 }
 
+function lerp_int(a, b, t) {
+    return Math.round(a + t * (b - a));
+}
+
+function inverse_lerp(a, b, v) {
+    return (v - a) / (b - a);
+}
+
 function normalize_heightmap() {
     // TODO: corriger, l'affichage n'est pas normalisé
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
@@ -384,9 +387,8 @@ function normalize_heightmap() {
         }
     }
 
-    const range = maxVal - minVal;
     for (let i = 0; i < mapWidth * mapHeight; ++i) {
-        pixels[i * 4] = lerp_int(0, 255, (pixels[i * 4] - minVal) / range);
+        pixels[i * 4] = 255 * inverse_lerp(minVal, maxVal, pixels[i * 4]);
     }
 
     generate_normals({pixels: pixels});
